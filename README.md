@@ -30,11 +30,21 @@ owner can ever authorize a withdrawal from it.
 ## Build and test
 
 ```bash
-anchor build
-anchor test
+anchor build          # compile the program
+anchor test            # local-validator integration tests (tests/vault.ts)
+cargo test -p programs-noirwire  # unit tests (balance-check logic, PDA derivation)
+npm run typecheck       # tsc --noEmit over the test suite
 ```
 
-`anchor test` builds the program, spins up a local validator, and runs the
-Mocha/TypeScript test suite in `tests/`, which covers initialization,
-deposits, successful owner withdrawals, a rejected withdrawal from a
-non-owner keypair, and a rejected over-withdrawal.
+`anchor test` spins up a local validator and runs the Mocha/TypeScript
+integration suite in `tests/vault.ts`: initialization, deposits (including a
+non-owner depositor and multiple accumulating deposits), successful owner
+withdrawals, a rejected non-owner withdrawal, a rejected over-withdrawal, two
+owners' vaults staying fully independent, a rejected double-initialize,
+zero-amount deposit/withdraw no-ops, full-balance draining (which removes the
+account from the ledger), and a hand-crafted transaction proving the program
+itself - not just the generated client - rejects a forged System Program
+account.
+
+`cargo test` runs Rust-level unit tests against the vault's balance-check
+logic and its PDA derivation, with no validator needed.

@@ -3,6 +3,13 @@ use anchor_lang::system_program::{self, CreateAccount, Transfer};
 
 declare_id!("5aqYNsJsmRuasaFMMWAF2s94r1bTuXZC46A6Ro9C82GY");
 
+/// Pure balance check backing `withdraw`: the vault must hold at least
+/// `amount` lamports for the withdrawal to proceed.
+fn ensure_sufficient_funds(balance: u64, amount: u64) -> Result<()> {
+    require!(balance >= amount, VaultError::InsufficientFunds);
+    Ok(())
+}
+
 #[program]
 pub mod vault {
     use super::*;
@@ -38,10 +45,7 @@ pub mod vault {
     }
 
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        require!(
-            ctx.accounts.vault.lamports() >= amount,
-            VaultError::InsufficientFunds
-        );
+        ensure_sufficient_funds(ctx.accounts.vault.lamports(), amount)?;
 
         let owner_key = ctx.accounts.owner.key();
         let bump = ctx.bumps.vault;
@@ -113,4 +117,52 @@ pub struct Withdraw<'info> {
 pub enum VaultError {
     #[msg("Withdrawal amount exceeds vault balance")]
     InsufficientFunds,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allows_withdrawing_the_exact_balance() {
+        assert!(ensure_sufficient_funds(1_000, 1_000).is_ok());
+    }
+
+    #[test]
+    fn rejects_withdrawing_more_than_the_balance() {
+        let err = ensure_sufficient_funds(1_000, 1_001).unwrap_err();
+        assert_eq!(err, VaultError::InsufficientFunds.into());
+    }
+
+    #[test]
+    fn allows_a_zero_amount_withdrawal_as_a_no_op() {
+        // A zero-amount withdrawal never exceeds any balance, including an
+        // empty vault, so it is treated as a valid no-op rather than an error.
+        assert!(ensure_sufficient_funds(0, 0).is_ok());
+        assert!(ensure_sufficient_funds(1_000, 0).is_ok());
+    }
+
+    #[test]
+    fn handles_the_u64_max_boundary() {
+        assert!(ensure_sufficient_funds(u64::MAX, u64::MAX).is_ok());
+        assert!(ensure_sufficient_funds(u64::MAX - 1, u64::MAX).is_err());
+    }
+
+    #[test]
+    fn same_owner_derives_the_identical_vault_address_and_bump() {
+        let owner = Pubkey::new_unique();
+        let (pda_a, bump_a) = Pubkey::find_program_address(&[b"vault", owner.as_ref()], &crate::ID);
+        let (pda_b, bump_b) = Pubkey::find_program_address(&[b"vault", owner.as_ref()], &crate::ID);
+        assert_eq!(pda_a, pda_b);
+        assert_eq!(bump_a, bump_b);
+    }
+
+    #[test]
+    fn different_owners_derive_different_vault_addresses() {
+        let owner_a = Pubkey::new_unique();
+        let owner_b = Pubkey::new_unique();
+        let (pda_a, _) = Pubkey::find_program_address(&[b"vault", owner_a.as_ref()], &crate::ID);
+        let (pda_b, _) = Pubkey::find_program_address(&[b"vault", owner_b.as_ref()], &crate::ID);
+        assert_ne!(pda_a, pda_b);
+    }
 }
