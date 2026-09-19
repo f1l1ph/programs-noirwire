@@ -8,6 +8,9 @@ skip-lint = false
 [programs.localnet]
 programs_noirwire = "5aqYNsJsmRuasaFMMWAF2s94r1bTuXZC46A6Ro9C82GY"
 
+[programs.testnet]
+programs_noirwire = "5aqYNsJsmRuasaFMMWAF2s94r1bTuXZC46A6Ro9C82GY"
+
 [registry]
 url = "https://api.apr.dev"
 
