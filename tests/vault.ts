@@ -1,6 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import { BN, Program } from "@coral-xyz/anchor";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
+import {
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
 import { assert } from "chai";
 import { Vault } from "../target/types/vault";
 
@@ -10,7 +15,10 @@ describe("vault", () => {
   const idl = (anchor.workspace.vault as Program<Vault>).idl;
 
   async function airdrop(pubkey: PublicKey, lamports: number): Promise<void> {
-    const signature = await baseProvider.connection.requestAirdrop(pubkey, lamports);
+    const signature = await baseProvider.connection.requestAirdrop(
+      pubkey,
+      lamports,
+    );
     const latestBlockhash = await baseProvider.connection.getLatestBlockhash();
     await baseProvider.connection.confirmTransaction({
       signature,
@@ -35,13 +43,16 @@ describe("vault", () => {
     const provider = new anchor.AnchorProvider(
       baseProvider.connection,
       new anchor.Wallet(owner),
-      anchor.AnchorProvider.defaultOptions()
+      anchor.AnchorProvider.defaultOptions(),
     );
     const program = new Program<Vault>(idl, provider);
     return { owner, program, provider };
   }
 
-  async function getConfirmedTransaction(connection: anchor.web3.Connection, signature: string) {
+  async function getConfirmedTransaction(
+    connection: anchor.web3.Connection,
+    signature: string,
+  ) {
     for (let attempt = 0; attempt < 10; attempt++) {
       const tx = await connection.getTransaction(signature, {
         commitment: "confirmed",
@@ -52,7 +63,9 @@ describe("vault", () => {
       }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    throw new Error(`transaction ${signature} was not found after confirmation`);
+    throw new Error(
+      `transaction ${signature} was not found after confirmation`,
+    );
   }
 
   /**
@@ -62,9 +75,10 @@ describe("vault", () => {
    */
   function balanceDelta(
     tx: NonNullable<Awaited<ReturnType<typeof getConfirmedTransaction>>>,
-    pubkey: PublicKey
+    pubkey: PublicKey,
   ): number {
-    const accountKeys = tx.transaction.message.getAccountKeys().staticAccountKeys;
+    const accountKeys =
+      tx.transaction.message.getAccountKeys().staticAccountKeys;
     const index = accountKeys.findIndex((key) => key.equals(pubkey));
     if (index === -1) {
       throw new Error(`account ${pubkey.toBase58()} not found in transaction`);
@@ -73,7 +87,10 @@ describe("vault", () => {
   }
 
   function vaultPdaFor(owner: PublicKey, programId: PublicKey): PublicKey {
-    const [pda] = PublicKey.findProgramAddressSync([Buffer.from("vault"), owner.toBuffer()], programId);
+    const [pda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer()],
+      programId,
+    );
     return pda;
   }
 
@@ -84,7 +101,7 @@ describe("vault", () => {
     await program.methods
       .initialize()
       .accounts({
-        owner: owner.publicKey
+        owner: owner.publicKey,
       })
       .rpc();
 
@@ -93,7 +110,8 @@ describe("vault", () => {
     assert.ok(vaultAccount!.owner.equals(SystemProgram.programId));
     assert.equal(vaultAccount!.data.length, 0);
 
-    const rentExemptMinimum = await baseProvider.connection.getMinimumBalanceForRentExemption(0);
+    const rentExemptMinimum =
+      await baseProvider.connection.getMinimumBalanceForRentExemption(0);
     assert.equal(vaultAccount!.lamports, rentExemptMinimum);
   });
 
@@ -113,7 +131,7 @@ describe("vault", () => {
       .deposit(new BN(depositAmount))
       .accounts({
         depositor: owner.publicKey,
-        owner: owner.publicKey
+        owner: owner.publicKey,
       })
       .rpc();
 
@@ -135,7 +153,7 @@ describe("vault", () => {
       .deposit(new BN(depositAmount))
       .accounts({
         depositor: owner.publicKey,
-        owner: owner.publicKey
+        owner: owner.publicKey,
       })
       .rpc();
 
@@ -143,7 +161,7 @@ describe("vault", () => {
     const signature = await program.methods
       .withdraw(new BN(withdrawAmount))
       .accounts({
-        owner: owner.publicKey
+        owner: owner.publicKey,
       })
       .rpc();
 
@@ -171,25 +189,30 @@ describe("vault", () => {
       .deposit(new BN(depositAmount))
       .accounts({
         depositor: owner.publicKey,
-        owner: owner.publicKey
+        owner: owner.publicKey,
       })
       .rpc();
 
-    const { owner: intruder, program: intruderProgram } = await newFundedOwner(1);
+    const { owner: intruder, program: intruderProgram } = await newFundedOwner(
+      1,
+    );
 
     let rejected = false;
     try {
       await intruderProgram.methods
         .withdraw(new BN(1_000))
         .accounts({
-          owner: intruder.publicKey
+          owner: intruder.publicKey,
         })
         .rpc();
     } catch (_err) {
       rejected = true;
     }
 
-    assert.isTrue(rejected, "withdrawal by a non-owner signer should have been rejected");
+    assert.isTrue(
+      rejected,
+      "withdrawal by a non-owner signer should have been rejected",
+    );
   });
 
   it("rejects withdrawing more than the vault's balance", async () => {
@@ -206,7 +229,7 @@ describe("vault", () => {
       .deposit(new BN(depositAmount))
       .accounts({
         depositor: owner.publicKey,
-        owner: owner.publicKey
+        owner: owner.publicKey,
       })
       .rpc();
 
@@ -218,14 +241,17 @@ describe("vault", () => {
       await program.methods
         .withdraw(new BN(tooMuch))
         .accounts({
-          owner: owner.publicKey
+          owner: owner.publicKey,
         })
         .rpc();
     } catch (_err) {
       rejected = true;
     }
 
-    assert.isTrue(rejected, "withdrawing more than the vault balance should have been rejected");
+    assert.isTrue(
+      rejected,
+      "withdrawing more than the vault balance should have been rejected",
+    );
   });
 
   it("keeps two owners' vaults fully independent", async () => {
@@ -254,31 +280,35 @@ describe("vault", () => {
       .accounts({ depositor: ownerB.publicKey, owner: ownerB.publicKey })
       .rpc();
 
-    const vaultBBalanceBeforeWithdrawA = await baseProvider.connection.getBalance(vaultB);
+    const vaultBBalanceBeforeWithdrawA =
+      await baseProvider.connection.getBalance(vaultB);
 
     await programA.methods
       .withdraw(new BN(0.1 * LAMPORTS_PER_SOL))
       .accounts({ owner: ownerA.publicKey })
       .rpc();
 
-    const vaultBBalanceAfterWithdrawA = await baseProvider.connection.getBalance(vaultB);
+    const vaultBBalanceAfterWithdrawA =
+      await baseProvider.connection.getBalance(vaultB);
     assert.equal(
       vaultBBalanceAfterWithdrawA,
       vaultBBalanceBeforeWithdrawA,
-      "owner B's vault balance must be untouched by owner A's withdrawal"
+      "owner B's vault balance must be untouched by owner A's withdrawal",
     );
 
     // And owner B's own withdrawal only ever touches vault B.
-    const vaultABalanceBeforeWithdrawB = await baseProvider.connection.getBalance(vaultA);
+    const vaultABalanceBeforeWithdrawB =
+      await baseProvider.connection.getBalance(vaultA);
     await programB.methods
       .withdraw(new BN(0.2 * LAMPORTS_PER_SOL))
       .accounts({ owner: ownerB.publicKey })
       .rpc();
-    const vaultABalanceAfterWithdrawB = await baseProvider.connection.getBalance(vaultA);
+    const vaultABalanceAfterWithdrawB =
+      await baseProvider.connection.getBalance(vaultA);
     assert.equal(
       vaultABalanceAfterWithdrawB,
       vaultABalanceBeforeWithdrawB,
-      "owner A's vault balance must be untouched by owner B's withdrawal"
+      "owner A's vault balance must be untouched by owner B's withdrawal",
     );
   });
 
@@ -301,7 +331,10 @@ describe("vault", () => {
       rejected = true;
     }
 
-    assert.isTrue(rejected, "initializing an already-existing vault a second time should have been rejected");
+    assert.isTrue(
+      rejected,
+      "initializing an already-existing vault a second time should have been rejected",
+    );
   });
 
   it("accumulates multiple sequential deposits", async () => {
@@ -314,7 +347,11 @@ describe("vault", () => {
       .rpc();
 
     const balanceBefore = await baseProvider.connection.getBalance(vaultPda);
-    const deposits = [0.1 * LAMPORTS_PER_SOL, 0.05 * LAMPORTS_PER_SOL, 0.25 * LAMPORTS_PER_SOL];
+    const deposits = [
+      0.1 * LAMPORTS_PER_SOL,
+      0.05 * LAMPORTS_PER_SOL,
+      0.25 * LAMPORTS_PER_SOL,
+    ];
 
     for (const depositAmount of deposits) {
       await program.methods
@@ -337,7 +374,8 @@ describe("vault", () => {
       .accounts({ owner: owner.publicKey })
       .rpc();
 
-    const { owner: depositor, program: depositorProgram } = await newFundedOwner(1);
+    const { owner: depositor, program: depositorProgram } =
+      await newFundedOwner(1);
     const balanceBefore = await baseProvider.connection.getBalance(vaultPda);
     const depositAmount = 0.15 * LAMPORTS_PER_SOL;
 
@@ -345,7 +383,7 @@ describe("vault", () => {
       .deposit(new BN(depositAmount))
       .accounts({
         depositor: depositor.publicKey,
-        owner: owner.publicKey
+        owner: owner.publicKey,
       })
       .rpc();
 
@@ -370,7 +408,11 @@ describe("vault", () => {
       .rpc();
 
     const balanceAfter = await baseProvider.connection.getBalance(vaultPda);
-    assert.equal(balanceAfter, balanceBefore, "a zero-lamport transfer is accepted by the System Program and moves nothing");
+    assert.equal(
+      balanceAfter,
+      balanceBefore,
+      "a zero-lamport transfer is accepted by the System Program and moves nothing",
+    );
   });
 
   it("treats a zero-amount withdrawal as a successful no-op", async () => {
@@ -396,7 +438,11 @@ describe("vault", () => {
       .rpc();
 
     const balanceAfter = await baseProvider.connection.getBalance(vaultPda);
-    assert.equal(balanceAfter, balanceBefore, "a zero-amount withdrawal passes the balance check trivially and moves nothing");
+    assert.equal(
+      balanceAfter,
+      balanceBefore,
+      "a zero-amount withdrawal passes the balance check trivially and moves nothing",
+    );
   });
 
   it("draining the vault for its exact full balance removes the account from the ledger", async () => {
@@ -424,7 +470,7 @@ describe("vault", () => {
     const vaultAccount = await baseProvider.connection.getAccountInfo(vaultPda);
     assert.isNull(
       vaultAccount,
-      "an account drained to zero lamports is purged by the runtime rather than left behind at zero"
+      "an account drained to zero lamports is purged by the runtime rather than left behind at zero",
     );
   });
 
@@ -455,9 +501,18 @@ describe("vault", () => {
       .accounts({ owner: owner.publicKey })
       .instruction();
 
-    const systemProgramIndex = ix.keys.findIndex((key) => key.pubkey.equals(SystemProgram.programId));
-    assert.notEqual(systemProgramIndex, -1, "expected the instruction to reference the System Program");
-    ix.keys[systemProgramIndex] = { ...ix.keys[systemProgramIndex], pubkey: program.programId };
+    const systemProgramIndex = ix.keys.findIndex((key) =>
+      key.pubkey.equals(SystemProgram.programId),
+    );
+    assert.notEqual(
+      systemProgramIndex,
+      -1,
+      "expected the instruction to reference the System Program",
+    );
+    ix.keys[systemProgramIndex] = {
+      ...ix.keys[systemProgramIndex],
+      pubkey: program.programId,
+    };
 
     const tx = new anchor.web3.Transaction().add(ix);
 
@@ -470,7 +525,7 @@ describe("vault", () => {
 
     assert.isTrue(
       rejected,
-      "a hand-crafted instruction pointing 'system_program' at a forged program should have been rejected"
+      "a hand-crafted instruction pointing 'system_program' at a forged program should have been rejected",
     );
   });
 });
