@@ -5,3 +5,9 @@ target
 node_modules
 test-ledger
 .yarn
+
+# Keypairs. A Solana secret key is a 64-byte JSON array; never commit one.
+*.json.key
+.deploy-wallet.json
+*-keypair.json
+id.json
